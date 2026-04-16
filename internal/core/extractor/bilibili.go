@@ -136,6 +136,25 @@ func (b *BilibiliExtractor) Match(u *url.URL) bool {
 		bilibiliBangumiRegex.MatchString(urlStr)
 }
 
+func (b *BilibiliExtractor) extractPageNumber(urlStr string) int {
+    u, err := url.Parse(urlStr)
+    if err != nil {
+        return 1
+    }
+    
+    pageStr := u.Query().Get("p")
+    if pageStr == "" {
+        return 1
+    }
+    
+    page, err := strconv.Atoi(pageStr)
+    if err != nil || page < 1 {
+        return 1
+    }
+    
+    return page
+}
+
 // Extract retrieves video information from a Bilibili URL
 func (b *BilibiliExtractor) Extract(urlStr string) (Media, error) {
 	// Initialize HTTP client
@@ -176,7 +195,13 @@ func (b *BilibiliExtractor) Extract(urlStr string) (Media, error) {
 	if len(videoInfo.Pages) == 0 {
 		return nil, fmt.Errorf("no video pages found")
 	}
-	cid := videoInfo.Pages[0].CID
+
+	pageNum := b.extractPageNumber(urlStr)
+	if pageNum > len(videoInfo.Pages) {
+		return nil, fmt.Errorf("requested page %d but only %d pages exist", pageNum, len(videoInfo.Pages))
+	}
+	
+	cid := videoInfo.Pages[pageNum - 1].CID
 
 	// Fetch play URL to get stream info
 	streams, err := b.fetchPlayURL(aid, cid)
